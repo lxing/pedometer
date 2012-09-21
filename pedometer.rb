@@ -3,7 +3,7 @@ require "sinatra"
 class Pedometer < Sinatra::Base
 
   get "/" do
-    erb pedometer
+    erb :pedometer
   end
 
   run!
