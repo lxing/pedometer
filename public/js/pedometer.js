@@ -28,6 +28,11 @@ var ped = {
 
     google.maps.event.addListener(ped.map, "rightclick", function(event) { ped.pushPathNode(event); });
     $("#undo").click(function() { ped.popPathNode(true); });
+    $("#clear").click(ped.clear);
+    $("#undo, #clear").hover(
+      function() { $(this).css("border", "solid 2px black") },
+      function() { $(this).css("border", "solid 1px black") }
+    );
     $("#elevation").mouseout(function() { ped.renderElevationTooltip(null); });
   },
 
@@ -136,7 +141,6 @@ var ped = {
   // Rendering
 
   renderPathNodeInfo: function(pathElem) {
-    console.log(pathElem.grade);
     pathElem.infoWindow = new google.maps.InfoWindow({
       content : "<div class='info-window'>" +
         "</br>Distance: " + ped.mToKm(pathElem.distance) + " km" +
@@ -144,7 +148,7 @@ var ped = {
         "</br>Climb: " + Math.round(pathElem.climb) + " m" +
         "</br>Grade: " + Math.round(pathElem.grade * 1000) / 10 + "%" +
         "</div>",
-      disableAutoPan: true
+      disableAutoPan: true,
     });
 
     google.maps.event.addListener(pathElem.node, "mouseover", function() {
