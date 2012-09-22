@@ -3,12 +3,16 @@ var ped = {
   DEFAULT_CENTER: new google.maps.LatLng(37.4419, -122.1419), // Palo Alto :3
   RED: "ff776b",
   WHITE: "ffffff",
+  M_PER_KM: 1000,
+  M_PER_MI: 1609.34,
+  R: 6371 * 1000, // Earth radius in m
 
   settings: {
     travelMode: google.maps.TravelMode.BICYCLING,
     unitSystem: google.maps.UnitSystem.METRIC,
-    dataThreshold: 3000, // max number of elevation points to plot
-    showMileMarkers: true
+    dataThreshold: 3000, // Max number of elevation points to plot
+    showMileMarkers: true,
+    mPerUnit: 1000
   },
 
   map: null,
@@ -46,7 +50,7 @@ var ped = {
       function() { $(this).css("border", "solid 1px black") }
     );
 
-    $("#markers").click(ped.toggleMileMarkers);
+    $("#markers").click(function() { ped.toggleMileMarkers(ped.settings.showMileMarkers) });
     $("#undo").click(function() { ped.popPathElem(true); });
     $("#clear").click(ped.clear);
 
@@ -112,8 +116,26 @@ var ped = {
   },
 
   computePathMileMarkers: function(pathElem) {
-    ped.renderNumberedMarker(ped.path.length, pathElem.node.getPosition(), ped.WHITE);
-    pathElem.mileMarkers.push(marker);
+    var distance = pathElem.totalDistance - pathElem.distance;
+    var nextMileToRender = Math.floor(distance / ped.settings.mPerUnit) + 1;
+
+    var haversineEstimations = pathElem.edge.overview_path.slice(1).map(function(position, index) {
+      return ped.haversineDist(position, pathElem.edge.overview_path[index]);
+    });
+    var haversineSum = haversineEstimations.reduce(function(sum, est) {
+      return sum + est;
+    }, 0);
+
+    $.each(pathElem.edge.overview_path.slice(1), function(index, position) {
+      distance += haversineEstimations[index] / haversineSum  * pathElem.distance;
+      if (distance > nextMileToRender * ped.settings.mPerUnit) {
+        var marker = ped.renderNumberedMarker(
+          nextMileToRender, position, ped.WHITE, ped.settings.showMileMarkers);
+        pathElem.mileMarkers.push(marker);
+        nextMileToRender += 1;
+      }
+    });
+
     ped.computePathElevation(pathElem);
   },
 
@@ -146,7 +168,7 @@ var ped = {
 
   pushPathElem: function(event) {
     var pathElem = {
-      node: ped.renderNumberedMarker(ped.path.length + 1, event.latLng, ped.RED),
+      node: ped.renderNumberedMarker(ped.path.length + 1, event.latLng, ped.RED, true),
       infoWindow: null,
 
       edge: null,
@@ -194,8 +216,8 @@ var ped = {
     }
   },
 
-  toggleMileMarkers: function() {
-    ped.settings.showMileMarkers = !ped.settings.showMileMarkers;
+  toggleMileMarkers: function(showing) {
+    ped.settings.showMileMarkers = !showing;
     $.each(ped.path, function(index, pathElem) {
       $.each(pathElem.mileMarkers, function(index, marker) {
         marker.setVisible(ped.settings.showMileMarkers);
@@ -221,8 +243,9 @@ var ped = {
     pathElem.renderer.setDirections(response);
   },
 
-  renderNumberedMarker: function(number, position, color) {
+  renderNumberedMarker: function(number, position, color, show) {
     return new google.maps.Marker({
+      visible: show,
       position: position,
       map: ped.map,
       icon: "http://chart.apis.google.com/chart?chst=d_map_pin_letter&chld=" +
@@ -355,9 +378,29 @@ var ped = {
     return path.map(function(pathElem, index) {
       return { latLng: new google.maps.LatLng(pathElem[0], pathElem[1]) };
     });
+  },
+
+  // http://www.movable-type.co.uk/scripts/latlong.html
+  haversineDist: function(p1, p2) {
+    x = p1; y = p2;
+    var dLat = ped.toRad(p2.lat() - p1.lat());
+    var dLng = ped.toRad(p2.lng() - p1.lng());
+    var lat1 = ped.toRad(p1.lat());
+    var lat2 = ped.toRad(p2.lat());
+
+    var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.sin(dLng/2) * Math.sin(dLng/2) * Math.cos(lat1) * Math.cos(lat2); 
+    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); 
+    return ped.R * c;
+  },
+
+  toRad: function(number) {
+    return number * Math.PI / 180
   }
 
+
 }
+var x, y;
 
 $(function() {
   if(navigator.geolocation) {
@@ -370,3 +413,9 @@ $(function() {
     ped.initialize(ped.DEFAULT_CENTER);
   };
 });
+
+if (typeof(Number.prototype.toRad) === "undefined") {
+  Number.prototype.toRad = function() {
+    return this * Math.PI / 180;
+  }
+}
