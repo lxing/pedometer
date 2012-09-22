@@ -3,16 +3,31 @@ var ped = {
   DEFAULT_CENTER: new google.maps.LatLng(37.4419, -122.1419), // Palo Alto :3
   RED: "ff776b",
   WHITE: "ffffff",
-  M_PER_KM: 1000,
-  M_PER_MI: 1609.34,
   R: 6371 * 1000, // Earth radius in m
+
+  IMPERIAL: {
+    utype: 0,
+    usystem: "Imperial",
+    unit: "ft",
+    bigUnit: "mi",
+    mPerUnit: 0.3048,
+    mPerBigUnit: 1609.34
+  },
+
+  METRIC: {
+    utype: 1,
+    usystem: "Metric",
+    unit: "m",
+    bigUnit: "km",
+    mPerUnit: 1,
+    mPerBigUnit: 1000
+  },
 
   settings: {
     travelMode: google.maps.TravelMode.BICYCLING,
     unitSystem: google.maps.UnitSystem.METRIC,
     dataThreshold: 3000, // Max number of elevation points to plot
-    showMileMarkers: true,
-    mPerUnit: 1000
+    showMileMarkers: false,
   },
 
   map: null,
@@ -24,6 +39,8 @@ var ped = {
   pathsToLoad: [],
 
   initialize: function(center) {
+    ped.setMetricSystem(ped.IMPERIAL.utype);
+
     ped.map = new google.maps.Map(document.getElementById("map_canvas"), {
       center: center,
       mapTypeId: google.maps.MapTypeId.ROADMAP,
@@ -50,6 +67,7 @@ var ped = {
       function() { $(this).css("border", "solid 1px black") }
     );
 
+    $("#usystem").click(function() { ped.setMetricSystem(1 - ped.settings.utype) });
     $("#markers").click(function() { ped.toggleMileMarkers(ped.settings.showMileMarkers) });
     $("#undo").click(function() { ped.popPathElem(true); });
     $("#clear").click(ped.clear);
@@ -78,6 +96,19 @@ var ped = {
     });
 
     $("#elevation").mouseout(function() { ped.renderElevationTooltip(null); });
+  },
+
+  setMetricSystem: function(utype) {
+    if (ped.settings.utype === utype) return;
+
+    var system = (utype === ped.IMPERIAL.utype) ? ped.IMPERIAL : ped.METRIC;
+    for (var attr in system) { ped.settings[attr] = system[attr]; }
+
+    $("#markers").html(ped.settings.bigUnit + " Markers");
+    $("#distance").html("0" + ped.settings.bigUnit);
+    $("#usystem").html(ped.settings.usystem);
+
+    ped.loadPath(ped.encodePath());
   },
 
   loadPath: function(data) {
@@ -117,7 +148,7 @@ var ped = {
 
   computePathMileMarkers: function(pathElem) {
     var distance = pathElem.totalDistance - pathElem.distance;
-    var nextMileToRender = Math.floor(distance / ped.settings.mPerUnit) + 1;
+    var nextMileToRender = Math.floor(distance / ped.settings.mPerBigUnit) + 1;
 
     var haversineEstimations = pathElem.edge.overview_path.slice(1).map(function(position, index) {
       return ped.haversineDist(position, pathElem.edge.overview_path[index]);
@@ -128,7 +159,7 @@ var ped = {
 
     $.each(pathElem.edge.overview_path.slice(1), function(index, position) {
       distance += haversineEstimations[index] / haversineSum  * pathElem.distance;
-      if (distance > nextMileToRender * ped.settings.mPerUnit) {
+      if (distance > nextMileToRender * ped.settings.mPerBigUnit) {
         var marker = ped.renderNumberedMarker(
           nextMileToRender, position, ped.WHITE, ped.settings.showMileMarkers);
         pathElem.mileMarkers.push(marker);
@@ -187,7 +218,7 @@ var ped = {
     ped.path.push(pathElem);
 
     // When reloading a path, the first node won't trigger the asynchronous callback
-    // because it has no path data to load. Instead it's manually triggered here.
+    // because it has no path data to load. Instead trigger it manually here.
     if (ped.pathsToLoad.length > 0 && ped.path.length === 1) ped.loadNextPathElem();
   },
 
@@ -256,9 +287,9 @@ var ped = {
   renderPathElemInfo: function(pathElem) {
     pathElem.infoWindow = new google.maps.InfoWindow({
       content : "<div class='info-window'>" +
-        "</br>Distance: " + ped.mToKm(pathElem.distance) + " km" +
-        "</br>Total: " + ped.mToKm(pathElem.totalDistance) + " km" +
-        "</br>Climb: " + Math.round(pathElem.climb) + " m" +
+        "</br>Distance: " + ped.convertBig(pathElem.distance) + ped.settings.bigUnit +
+        "</br>Total: " + ped.convertBig(pathElem.totalDistance) + ped.settings.bigUnit +
+        "</br>Climb: " + ped.convert(pathElem.climb) + ped.settings.unit +
         "</br>Grade: " + Math.round(pathElem.grade * 1000) / 10 + "%" +
         "</div>",
       disableAutoPan: true,
@@ -275,7 +306,7 @@ var ped = {
   },
 
   renderDistance: function(distance) {
-    $("#distance").html(ped.mToKm(distance) + " km");
+    $("#distance").html(ped.convertBig(distance) + ped.settings.bigUnit);
   },
 
   renderElevationTooltip: function(position) {
@@ -323,7 +354,7 @@ var ped = {
         title: { text: "Height" },
         labels: {
           formatter: function() {
-            return this.value + "m";
+            return ped.convert(this.value) + ped.settings.unit;
           }
         }
       },
@@ -333,7 +364,8 @@ var ped = {
       },
       tooltip: {
         formatter: function() {
-          return ped.mToKm(this.x) + "km | " + Math.round(this.y) + "m";
+          return ped.convertBig(this.x) +  ped.settings.bigUnit +
+            " | " + ped.convert(this.y) + ped.settings.unit;
         }
       },
       plotOptions: {
@@ -360,8 +392,12 @@ var ped = {
 
   // Utility
 
-  mToKm: function(m) {
-    return Math.round(m / 10) / 100;
+  convert: function(m) {
+    return Math.round(m / ped.settings.mPerUnit);
+  },
+
+  convertBig: function(m) {
+    return Math.round(m / ped.settings.mPerBigUnit * 100) / 100;
   },
 
   encodePath: function() {
@@ -398,9 +434,7 @@ var ped = {
     return number * Math.PI / 180
   }
 
-
 }
-var x, y;
 
 $(function() {
   if(navigator.geolocation) {
@@ -413,9 +447,3 @@ $(function() {
     ped.initialize(ped.DEFAULT_CENTER);
   };
 });
-
-if (typeof(Number.prototype.toRad) === "undefined") {
-  Number.prototype.toRad = function() {
-    return this * Math.PI / 180;
-  }
-}
