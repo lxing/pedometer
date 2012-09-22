@@ -12,7 +12,6 @@ var ped = {
   elevationChart: null,
   elevationTooltip: null,
   path: [],
-  distance: 0,
 
   initialize: function() {
     ped.map = new google.maps.Map(document.getElementById("map_canvas"), {
@@ -32,7 +31,9 @@ var ped = {
     $("#elevation").mouseout(function() { ped.renderElevationTooltip(null); });
   },
 
-  // Asynchronously query the elevations along DirectionsRoute
+  // Heavy lifting
+
+  // Asynchronously query the elevations along the DirectionsRoute
   computePathElevation: function(pathElem) {
     var request = {
       locations: pathElem.edge.overview_path
@@ -41,6 +42,10 @@ var ped = {
     ped.elevations.getElevationForLocations(request, function(response, status) {
       if (status === google.maps.ElevationStatus.OK) {
         pathElem.elevations = response;
+        pathElem.climb = response.slice(-1)[0].elevation - response[0].elevation;
+        pathElem.grade = pathElem.climb / pathElem.distance;
+
+        ped.renderPathNodeInfo(pathElem);
         ped.renderElevation();
       };
     });
@@ -67,8 +72,6 @@ var ped = {
           pathElem.distance += leg.distance.value;
         });
         pathElem.totalDistance = prevElem.totalDistance + pathElem.distance;
-        pathElem.node.setTitle(ped.mToKm(pathElem.distance) + "km | " +
-          ped.mToKm(pathElem.totalDistance) + "km total");
         ped.renderDistance(pathElem.totalDistance);
 
         ped.computePathElevation(pathElem);
@@ -79,12 +82,16 @@ var ped = {
   pushPathNode: function(event) {
     var pathElem = {
       index: ped.path.length,
+
       node: new google.maps.Marker({ 
         position: event.latLng,
         map: ped.map,
       }),
+      infoWindow: null,
+
       edge: null,
       elevations: [],
+
       renderer: new google.maps.DirectionsRenderer({
         suppressBicyclingLayer: true,
         preserveViewport: true,
@@ -93,8 +100,11 @@ var ped = {
           visible: false,
         }
       }),
+
       distance: 0,
-      totalDistance: 0
+      totalDistance: 0,
+      climb: 0,
+      grade: 0
     }
 
     ped.computePathEdge(pathElem);
@@ -123,6 +133,29 @@ var ped = {
   },
 
 
+  // Rendering
+
+  renderPathNodeInfo: function(pathElem) {
+    console.log(pathElem.grade);
+    pathElem.infoWindow = new google.maps.InfoWindow({
+      content : "<div class='info-window'>" +
+        "</br>Distance: " + ped.mToKm(pathElem.distance) + " km" +
+        "</br>Total: " + ped.mToKm(pathElem.totalDistance) + " km" +
+        "</br>Climb: " + Math.round(pathElem.climb) + " m" +
+        "</br>Grade: " + Math.round(pathElem.grade * 1000) / 10 + "%" +
+        "</div>",
+      disableAutoPan: true
+    });
+
+    google.maps.event.addListener(pathElem.node, "mouseover", function() {
+      pathElem.infoWindow.open(ped.map, pathElem.node);
+    });
+
+    google.maps.event.addListener(pathElem.node, "mouseout", function() {
+      pathElem.infoWindow.close();
+    });
+
+  },
 
   renderDistance: function(distance) {
     $("#distance").html(ped.mToKm(distance) + " km");
@@ -207,7 +240,7 @@ var ped = {
     });
   },
 
-
+  // Utility
 
   mToKm: function(m) {
     return Math.round(m / 10) / 100;
