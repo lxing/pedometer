@@ -43,7 +43,7 @@ var ped = {
       function() { $(this).css("border", "solid 1px black") }
     );
 
-    $("#undo").click(function() { ped.popPathNode(true); });
+    $("#undo").click(function() { ped.popPathElem(true); });
     $("#clear").click(ped.clear);
 
     $("#save").click(function() {
@@ -96,7 +96,7 @@ var ped = {
         pathElem.climb = response.slice(-1)[0].elevation - response[0].elevation;
         pathElem.grade = pathElem.climb / pathElem.distance;
 
-        ped.renderPathNodeInfo(pathElem);
+        ped.renderPathElemInfo(pathElem);
         if (ped.pathsToLoad.length > 0) {
           ped.loadNextPathElem();
         } else {
@@ -168,7 +168,7 @@ var ped = {
     if (ped.pathsToLoad.length > 0 && ped.path.length === 1) ped.loadNextPathElem();
   },
 
-  popPathNode: function(rerender) {
+  popPathElem: function(rerender) {
     if (ped.path.length === 0) return;
     var pathElem = ped.path.pop();
 
@@ -186,14 +186,14 @@ var ped = {
     if (ped.elevationChart) ped.elevationChart.destroy();
     ped.elevationChart = null;
     while (ped.path.length > 0) {
-      ped.popPathNode(false);
+      ped.popPathElem(false);
     }
   },
 
 
   // Rendering
 
-  renderPathNodeInfo: function(pathElem) {
+  renderPathElemInfo: function(pathElem) {
     pathElem.infoWindow = new google.maps.InfoWindow({
       content : "<div class='info-window'>" +
         "</br>Distance: " + ped.mToKm(pathElem.distance) + " km" +
