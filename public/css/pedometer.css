@@ -44,7 +44,7 @@ body {
 
 #distance {
   left: 47%;
-  border: solid 2px black;
+  background: white;
 }
 
 #save {
@@ -53,6 +53,15 @@ body {
 
 #load {
   left: 61%;
+}
+
+#sview_button {
+  left: 68%;
+  width: 13%;
+}
+
+#help_button {
+  left: 82%;
 }
 
 #persist {
@@ -64,6 +73,14 @@ body {
 #persist_input {
   width: 100%;
   margin-left: 2px; margin-right: 1px;
+}
+
+#help {
+  top: 40px; left: 68%;
+  width: 19%;
+  padding-left: 15px;
+  text-align: justify; font-size: 12;
+  display: none;
 }
 
 

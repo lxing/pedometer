@@ -97,6 +97,10 @@ var ped = {
       $("#persist").hide("fast");
     });
 
+    $("#help_button").click(function() {
+      $("#help").toggle("fast");
+    });
+
     $("#elevation").mouseout(function() { ped.renderElevationTooltip(null); });
   },
 
