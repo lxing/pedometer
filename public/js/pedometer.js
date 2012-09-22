@@ -3,7 +3,7 @@ var ped = {
   settings: {
     travelMode: google.maps.TravelMode.BICYCLING,
     unitSystem: google.maps.UnitSystem.METRIC,
-    dataThreshold: 3000, // elevation points
+    dataThreshold: 3000, // max number of elevation points to plot
   },
 
   map: null,
@@ -12,6 +12,7 @@ var ped = {
   elevationChart: null,
   elevationTooltip: null,
   path: [],
+  pathsToLoad: [],
 
   initialize: function() {
     ped.map = new google.maps.Map(document.getElementById("map_canvas"), {
@@ -26,17 +27,59 @@ var ped = {
       map: ped.map
     }),
 
-    google.maps.event.addListener(ped.map, "rightclick", function(event) { ped.pushPathNode(event); });
-    $("#undo").click(function() { ped.popPathNode(true); });
-    $("#clear").click(ped.clear);
-    $("#undo, #clear").hover(
+    google.maps.event.addListener(ped.map, "rightclick", function(event) {
+      ped.pushPathElem(event, true);
+    });
+
+    ped.registerEventHandlers();
+  },
+
+  registerEventHandlers: function() {
+    $(".clickable").hover(
       function() { $(this).css("border", "solid 2px black") },
       function() { $(this).css("border", "solid 1px black") }
     );
+
+    $("#undo").click(function() { ped.popPathNode(true); });
+    $("#clear").click(ped.clear);
+
+    $("#save").click(function() {
+      if ($("#persist").is(":visible")) {
+        $("#persist").hide("fast");
+      } else {
+        $("#persist").show("fast");
+        $("#persist_input").attr("value", ped.encodePath()).select();
+      };
+    }).mouseout(function() {
+      $("#persist").hide("fast");
+    });
+
+    $("#load").click(function() {
+      if ($("#persist").is(":visible")) {
+        $("#persist").hide("fast");
+        ped.loadPath($("#persist_input").attr("value"));
+      } else {
+        $("#persist").show("fast");
+        $("#persist_input").attr("value", "").select();
+      };
+    }).mouseout(function() {
+      $("#persist").hide("fast");
+    });
+
     $("#elevation").mouseout(function() { ped.renderElevationTooltip(null); });
   },
 
-  // Heavy lifting
+  loadPath: function(data) {
+    ped.clear();
+    ped.pathsToLoad = ped.decodePath(data);
+    ped.loadNextPathElem();
+  },
+
+  loadNextPathElem: function() {
+    path = ped.pathsToLoad.shift();
+    if (!path) return;
+    ped.pushPathElem(path);
+  },
 
   // Asynchronously query the elevations along the DirectionsRoute
   computePathElevation: function(pathElem) {
@@ -51,14 +94,18 @@ var ped = {
         pathElem.grade = pathElem.climb / pathElem.distance;
 
         ped.renderPathNodeInfo(pathElem);
-        ped.renderElevation();
+        if (ped.pathsToLoad.length > 0) {
+          ped.loadNextPathElem();
+        } else {
+          ped.renderElevation();
+        }
       };
     });
   },
 
   // Asynchronously query the DirectionsRoute to the pathElem's node and draw them
   computePathEdge: function(pathElem) {
-    if (ped.path.length === 0) return null;
+    if (ped.path.length === 0) return;
     var prevElem = ped.path.slice(-1)[0];
 
     var request = {
@@ -84,10 +131,8 @@ var ped = {
     });
   },
 
-  pushPathNode: function(event) {
+  pushPathElem: function(event) {
     var pathElem = {
-      index: ped.path.length,
-
       node: new google.maps.Marker({ 
         position: event.latLng,
         map: ped.map,
@@ -114,6 +159,10 @@ var ped = {
 
     ped.computePathEdge(pathElem);
     ped.path.push(pathElem);
+
+    // When reloading a path, the first node won't trigger the asynchronous callback
+    // because it has no path data to load. Instead it's manually triggered here.
+    if (ped.pathsToLoad.length > 0 && ped.path.length === 1) ped.loadNextPathElem();
   },
 
   popPathNode: function(rerender) {
@@ -130,6 +179,7 @@ var ped = {
   },
 
   clear: function() {
+    ped.renderDistance(0);
     if (ped.elevationChart) ped.elevationChart.destroy();
     ped.elevationChart = null;
     while (ped.path.length > 0) {
@@ -244,10 +294,27 @@ var ped = {
     });
   },
 
+
   // Utility
 
   mToKm: function(m) {
     return Math.round(m / 10) / 100;
+  },
+
+  encodePath: function() {
+    var path = ped.path.map(function(pathElem, index) {
+      var latLng = pathElem.node.getPosition();
+      return [latLng.Xa, latLng.Ya];
+    });
+    return lzwEncode(Base64.encode(JSON.stringify(path)));
+  },
+
+  // Returns fake events to pass into pushPathElem
+  decodePath: function(data) {
+    var path = JSON.parse(Base64.decode(lzwDecode(data)));
+    return path.map(function(pathElem, index) {
+      return { latLng: new google.maps.LatLng(pathElem[0], pathElem[1]) };
+    });
   }
 
 }

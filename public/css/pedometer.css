@@ -1,4 +1,7 @@
-html { height: 100% }
+html {
+  height: 100%
+}
+
 body {
   height: 100%; margin: 0; padding: 0;
   font-family: Arial;
@@ -16,21 +19,38 @@ body {
   background: white;
   text-align: center;
   cursor: default;
-}
-
-#distance {
-  left: 47%;
   width: 6%;
 }
 
 #undo {
-  left: 40%;
-  width: 6%;
+  left: 33%;
 }
 
 #clear {
+  left: 40%;
+}
+
+#distance {
+  left: 47%;
+}
+
+#save {
   left: 54%;
-  width: 6%;
+}
+
+#load {
+  left: 61%;
+}
+
+#persist {
+  top: 40px; left: 33%;
+  width: 34%;
+  display: none;
+}
+
+#persist_input {
+  width: 100%;
+  margin-left: 2px;
 }
 
 

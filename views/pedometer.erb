@@ -5,13 +5,25 @@
     <script type="text/javascript" src="http://maps.googleapis.com/maps/api/js?key=AIzaSyBFzkP1MG9TqjeRIbwcqbelGNuHAOMTJKQ&sensor=false"></script>
     <script src="/js/jquery-1.8.1.min.js"></script>
     <script src="/js/highcharts.js"></script>
+    <script src="/js/base64.js"></script>
+    <script src="/js/lzw.js"></script>
     <script src="/js/pedometer.js"></script>
   </head>
   <body>
     <div id="map_canvas"></div>
+    <div id="undo" class="top-bar clickable">Undo</div>
+    <div id="clear" class="top-bar clickable">Clear</div>
     <div id="distance" class="top-bar">0 km</div>
-    <div id="undo" class="top-bar">Undo</div>
-    <div id="clear" class="top-bar">Clear</div>
+    <div id="save" class="top-bar clickable">Save</div>
+    <div id="load" class="top-bar clickable">Load</div>
+    <div id="persist" class="top-bar">
+      <table width="100%">
+        <tr>
+          <td style="width: 1;">Code</td>
+          <td><input id="persist_input" type="text" /></td>
+        </tr>
+      </table>
+    </div>
     <div id="elevation"></div>
   </body>
 </html>
