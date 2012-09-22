@@ -104,7 +104,7 @@ var ped = {
     var system = (utype === ped.IMPERIAL.utype) ? ped.IMPERIAL : ped.METRIC;
     for (var attr in system) { ped.settings[attr] = system[attr]; }
 
-    $("#markers").html(ped.settings.bigUnit + " Markers");
+    $("#markers").html(ped.settings.bigUnit + " Marks");
     $("#distance").html("0" + ped.settings.bigUnit);
     $("#usystem").html(ped.settings.usystem);
 
