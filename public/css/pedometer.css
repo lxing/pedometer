@@ -22,6 +22,10 @@ body {
   width: 6%;
 }
 
+#travel_mode {
+  left: 12%;
+}
+
 #usystem {
   left: 19%;
 }

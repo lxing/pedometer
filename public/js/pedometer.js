@@ -24,7 +24,7 @@ var ped = {
   },
 
   settings: {
-    travelMode: google.maps.TravelMode.BICYCLING,
+    travelMode: google.maps.TravelMode.RUNNING,
     unitSystem: google.maps.UnitSystem.METRIC,
     dataThreshold: 3000, // Max number of elevation points to plot
     showMileMarkers: false,
@@ -40,6 +40,7 @@ var ped = {
 
   initialize: function(center) {
     ped.setMetricSystem(ped.IMPERIAL.utype);
+    ped.toggleTravelMode();
 
     ped.map = new google.maps.Map(document.getElementById("map_canvas"), {
       center: center,
@@ -67,6 +68,7 @@ var ped = {
       function() { $(this).css("border", "solid 1px black") }
     );
 
+    $("#travel_mode").click(ped.toggleTravelMode);
     $("#usystem").click(function() { ped.setMetricSystem(1 - ped.settings.utype) });
     $("#markers").click(function() { ped.toggleMileMarkers(ped.settings.showMileMarkers) });
     $("#undo").click(function() { ped.popPathElem(true); });
@@ -98,18 +100,6 @@ var ped = {
     $("#elevation").mouseout(function() { ped.renderElevationTooltip(null); });
   },
 
-  setMetricSystem: function(utype) {
-    if (ped.settings.utype === utype) return;
-
-    var system = (utype === ped.IMPERIAL.utype) ? ped.IMPERIAL : ped.METRIC;
-    for (var attr in system) { ped.settings[attr] = system[attr]; }
-
-    $("#markers").html(ped.settings.bigUnit + " Marks");
-    $("#distance").html("0" + ped.settings.bigUnit);
-    $("#usystem").html(ped.settings.usystem);
-
-    ped.loadPath(ped.encodePath());
-  },
 
   loadPath: function(data) {
     ped.clear();
@@ -254,6 +244,29 @@ var ped = {
         marker.setVisible(ped.settings.showMileMarkers);
       });
     });
+  },
+
+  setMetricSystem: function(utype) {
+    if (ped.settings.utype === utype) return;
+
+    var system = (utype === ped.IMPERIAL.utype) ? ped.IMPERIAL : ped.METRIC;
+    for (var attr in system) { ped.settings[attr] = system[attr]; }
+
+    $("#markers").html(ped.settings.bigUnit + " Marks");
+    $("#distance").html("0" + ped.settings.bigUnit);
+    $("#usystem").html(ped.settings.usystem);
+
+    ped.loadPath(ped.encodePath());
+  },
+
+  toggleTravelMode: function() {
+    if (ped.settings.travelMode === google.maps.TravelMode.BICYCLING) {
+      ped.settings.travelMode = google.maps.TravelMode.WALKING
+      $("#travel_mode").html("Running");
+    } else {
+      ped.settings.travelMode = google.maps.TravelMode.BICYCLING
+      $("#travel_mode").html("Biking");
+    };
   },
 
 
