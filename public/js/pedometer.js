@@ -7,6 +7,8 @@ var ped = {
 
   map: null,
   directions: new google.maps.DirectionsService(),
+  elevations: new google.maps.ElevationService(),
+  elevationChart: null,
   path: [],
   distance: 0,
 
@@ -19,10 +21,24 @@ var ped = {
     });
 
     google.maps.event.addListener(ped.map, "rightclick", function(event) { ped.pushPathNode(event); });
-    $("#undo").click(ped.popPathNode);
+    $("#undo").click(function() { ped.popPathNode(true); });
   },
 
-  // Asynchronously query the directions to the pathElem's node and draw them
+  // Asynchronously query the elevations along DirectionsRoute
+  computePathElevation: function(pathElem) {
+    var request = {
+      locations: pathElem.edge.overview_path
+    };
+
+    ped.elevations.getElevationForLocations(request, function(response, status) {
+      if (status === google.maps.ElevationStatus.OK) {
+        pathElem.elevations = response;
+        ped.renderElevation();
+      };
+    });
+  },
+
+  // Asynchronously query the DirectionsRoute to the pathElem's node and draw them
   computePathEdge: function(pathElem) {
     if (ped.path.length === 0) return null;
     var prevElem = ped.path.slice(-1)[0];
@@ -36,7 +52,7 @@ var ped = {
 
     ped.directions.route(request, function(response, status) {
       if (status === google.maps.DirectionsStatus.OK) {
-        pathElem.edge = response;
+        pathElem.edge = response.routes[0];
         pathElem.renderer.setDirections(response);
 
         $.each(response.routes[0].legs, function(index, leg) {
@@ -44,6 +60,8 @@ var ped = {
         });
         pathElem.totalDistance = prevElem.totalDistance + pathElem.distance;
         ped.renderDistance(pathElem.totalDistance);
+
+        ped.computePathElevation(pathElem);
       };
     });
   },
@@ -73,17 +91,82 @@ var ped = {
     ped.path.push(pathElem);
   },
 
-  popPathNode: function() {
+  popPathNode: function(rerender) {
     if (ped.path.length === 0) return;
     var pathElem = ped.path.pop();
 
     pathElem.node.setVisible(false);
     pathElem.renderer.setMap(null);
-    ped.renderDistance(pathElem.totalDistance - pathElem.distance);
+
+    if(rerender) {
+      ped.renderDistance(pathElem.totalDistance - pathElem.distance);
+      ped.renderElevation();
+    };
   },
+
+
 
   renderDistance: function(distance) {
     $("#distance").html(Math.round(distance / 10) / 100 + " km");
+  },
+
+  renderElevation: function() {
+    var highChartsData = { x: [], y: [] };
+    $.each(ped.path, function(index, pathElem) {
+      startDistance = pathElem.totalDistance - pathElem.distance;
+      step = pathElem.distance / pathElem.elevations.length;
+
+      $.each(pathElem.elevations, function(index, point) {
+        highChartsData.x.push(startDistance + step * index),
+        highChartsData.y.push(point.elevation)
+      });
+    });
+
+    console.log(highChartsData)
+
+    if (ped.elevationChart) ped.elevationChart.destroy();
+    chart = new Highcharts.Chart({
+      chart: {
+        renderTo: "elevation",
+        type: "area",
+      },
+      title: {
+        text: "",
+      },
+      yAxis: {
+        title: { text: "Height" },
+        labels: {
+          formatter: function() {
+            return this.value + "m";
+          }
+        }
+      },
+      xAxis: {
+        tickInterval: 0,
+        title: { text: "Distance" },
+        categories: highChartsData.x
+      },
+      tooltip: {
+        formatter: function() {
+          return Math.round(this.x / 10) / 100 + "km | " + Math.round(this.y) + "m";
+        }
+      },
+      plotOptions: {
+        area: {
+          lineWidth: 1,
+          marker: {
+            enabled: false,
+          },
+        }
+      },
+      legend: {
+        enabled: false
+      },
+      series: [{
+        name: "Elevation",
+        data: highChartsData.y
+      }]
+    });
   },
 
 }

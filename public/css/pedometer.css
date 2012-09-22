@@ -5,19 +5,19 @@ body {
 }
 
 #map_canvas {
-  height: 80%; width: 100%;
+  height: 70%; width: 98%;
   margin: 10px;
 }
 
-#controls { 
-  height: 20%; width: 100%;
+#distance {
+  position: fixed; top: 10px; left: 47%;
   border: solid 1px black;
   padding: 3px; margin: 10px;
   background: white;
 }
 
-#distance {
-  position: fixed; top: 10px; left: 47%;
+#elevation {
+  height: 20%; width: 98%;
   border: solid 1px black;
   padding: 3px; margin: 10px;
   background: white;
