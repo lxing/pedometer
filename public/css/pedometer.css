@@ -75,7 +75,7 @@ body {
   margin-left: 2px; margin-right: 1px;
 }
 
-#help {
+#sview, #help {
   top: 40px; left: 68%;
   width: 19%;
   padding-left: 15px;
@@ -83,6 +83,14 @@ body {
   display: none;
 }
 
+#sview_controls {
+  text-align: center;
+}
+
+.sview-control {
+  padding-left: 5%; padding-right: 5%;
+  border: solid 1px black;
+}
 
 #elevation {
   height: 20%; width: 98%;

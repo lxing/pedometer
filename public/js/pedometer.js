@@ -35,6 +35,7 @@ var ped = {
   elevations: new google.maps.ElevationService(),
   elevationChart: null,
   elevationTooltip: null,
+  sviewTooltip: null,
   path: [],
   pathsToLoad: [],
 
@@ -53,7 +54,12 @@ var ped = {
     ped.elevationTooltip = new google.maps.Marker({
       visible: false,
       map: ped.map
-    }),
+    });
+
+    ped.sview = new google.maps.Marker({
+      visible: false,
+      map: ped.map
+    });
 
     google.maps.event.addListener(ped.map, "rightclick", function(event) {
       ped.pushPathElem(event, true);
@@ -81,8 +87,6 @@ var ped = {
         $("#persist").show("fast");
         $("#persist_input").attr("value", ped.encodePath()).select();
       };
-    }).mouseout(function() {
-      $("#persist").hide("fast");
     });
 
     $("#load").click(function() {
@@ -93,8 +97,10 @@ var ped = {
         $("#persist").show("fast");
         $("#persist_input").attr("value", "").select();
       };
-    }).mouseout(function() {
-      $("#persist").hide("fast");
+    });
+
+    $("#sview_button").click(function() {
+      $("#sview").toggle("fast");
     });
 
     $("#help_button").click(function() {
@@ -106,8 +112,9 @@ var ped = {
 
 
   loadPath: function(data) {
-    ped.clear();
+    if (data === "") return;
     ped.pathsToLoad = ped.decodePath(data);
+    ped.clear();
     ped.loadNextPathElem();
   },
 
@@ -144,18 +151,21 @@ var ped = {
     var distance = pathElem.totalDistance - pathElem.distance;
     var nextMileToRender = Math.floor(distance / ped.settings.mPerBigUnit) + 1;
 
-    var haversineEstimations = pathElem.edge.overview_path.slice(1).map(function(position, index) {
-      return ped.haversineDist(position, pathElem.edge.overview_path[index]);
+    $.each(pathElem.edge.overview_path.slice(1), function(index, position) {
+      var estimate = ped.haversineDistAndBearing(position, pathElem.edge.overview_path[index]);
+      pathElem.haversineDistances.push(estimate.distance);
+      pathElem.bearings.push(estimate.bearing);
     });
-    var haversineSum = haversineEstimations.reduce(function(sum, est) {
-      return sum + est;
+
+    var haversineSum = pathElem.haversineDistances.reduce(function(sum, distance) {
+      return sum + distance;
     }, 0);
 
     $.each(pathElem.edge.overview_path.slice(1), function(index, position) {
-      distance += haversineEstimations[index] / haversineSum  * pathElem.distance;
+      distance += pathElem.haversineDistances[index] / haversineSum  * pathElem.distance;
       if (distance > nextMileToRender * ped.settings.mPerBigUnit) {
         var marker = ped.renderNumberedMarker(
-          nextMileToRender, position, ped.WHITE, ped.settings.showMileMarkers);
+          nextMileToRender, position, ped.WHITE, ped.settings.showMileMarkers, -1);
         pathElem.mileMarkers.push(marker);
         nextMileToRender += 1;
       }
@@ -193,10 +203,13 @@ var ped = {
 
   pushPathElem: function(event) {
     var pathElem = {
-      node: ped.renderNumberedMarker(ped.path.length + 1, event.latLng, ped.RED, true),
+      node: ped.renderNumberedMarker(
+        ped.path.length + 1, event.latLng, ped.RED, true, 0),
       infoWindow: null,
 
       edge: null,
+      haversineDistances: [],
+      bearings: [],
       elevations: [],
       mileMarkers: [],
 
@@ -291,11 +304,12 @@ var ped = {
     pathElem.renderer.setDirections(response);
   },
 
-  renderNumberedMarker: function(number, position, color, show) {
+  renderNumberedMarker: function(number, position, color, show, zIndex) {
     return new google.maps.Marker({
       visible: show,
       position: position,
       map: ped.map,
+      zIndex: zIndex,
       icon: "http://chart.apis.google.com/chart?chst=d_map_pin_letter&chld=" +
         Math.round(number) + "|" + color
     });
@@ -434,21 +448,34 @@ var ped = {
   },
 
   // http://www.movable-type.co.uk/scripts/latlong.html
-  haversineDist: function(p1, p2) {
-    x = p1; y = p2;
+  haversineDistAndBearing: function(p1, p2) {
     var dLat = ped.toRad(p2.lat() - p1.lat());
     var dLng = ped.toRad(p2.lng() - p1.lng());
     var lat1 = ped.toRad(p1.lat());
     var lat2 = ped.toRad(p2.lat());
 
     var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-            Math.sin(dLng/2) * Math.sin(dLng/2) * Math.cos(lat1) * Math.cos(lat2); 
-    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); 
-    return ped.R * c;
+            Math.sin(dLng/2) * Math.sin(dLng/2) * Math.cos(lat1) * Math.cos(lat2);
+    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    var distance = ped.R * c;
+
+    var y = Math.sin(dLng) * Math.cos(lat2);
+    var x = Math.cos(lat1) * Math.sin(lat2) -
+            Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+    var bearing = ped.toDeg(Math.atan2(y, x));
+
+    return {
+      distance: distance,
+      bearing: bearing
+    }
   },
 
   toRad: function(number) {
     return number * Math.PI / 180
+  },
+
+  toDeg: function(number) {
+    return number * 180 / Math.PI
   }
 
 }
