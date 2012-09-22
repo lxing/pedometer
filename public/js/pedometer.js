@@ -1,6 +1,6 @@
 var ped = {
 
-  DEFAULT_CENTER: new google.maps.LatLng(37.4419, -122.1419),
+  DEFAULT_CENTER: new google.maps.LatLng(37.4419, -122.1419), // Palo Alto :3
   RED: "ff776b",
   WHITE: "ffffff",
 
@@ -112,7 +112,7 @@ var ped = {
   },
 
   computePathMileMarkers: function(pathElem) {
-    //ped.renderNumberedMarker(ped.path.length, pathElem.node.getPosition(), ped.WHITE);
+    ped.renderNumberedMarker(ped.path.length, pathElem.node.getPosition(), ped.WHITE);
     pathElem.mileMarkers.push(marker);
     ped.computePathElevation(pathElem);
   },
