@@ -1,5 +1,7 @@
 var ped = {
 
+  DEFAULT_CENTER: new google.maps.LatLng(37.4419, -122.1419),
+
   settings: {
     travelMode: google.maps.TravelMode.BICYCLING,
     unitSystem: google.maps.UnitSystem.METRIC,
@@ -14,11 +16,12 @@ var ped = {
   path: [],
   pathsToLoad: [],
 
-  initialize: function() {
+  initialize: function(center) {
     ped.map = new google.maps.Map(document.getElementById("map_canvas"), {
-      center: new google.maps.LatLng(37.4419, -122.1419),
+      center: center,
       mapTypeId: google.maps.MapTypeId.ROADMAP,
       draggableCursor: "crosshair",
+      scaleControl: "true",
       zoom: 13
     });
 
@@ -320,5 +323,13 @@ var ped = {
 }
 
 $(function() {
-  ped.initialize();
-})
+  if(navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(function(position) {
+      ped.initialize(new google.maps.LatLng(position.coords.latitude,position.coords.longitude));
+    }, function() {
+      ped.initialize(ped.DEFAULT_CENTER);
+    });
+  } else {
+    ped.initialize(ped.DEFAULT_CENTER);
+  };
+});
