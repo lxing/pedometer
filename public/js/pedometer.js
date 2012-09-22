@@ -1,11 +1,14 @@
 var ped = {
 
   DEFAULT_CENTER: new google.maps.LatLng(37.4419, -122.1419),
+  RED: "ff776b",
+  WHITE: "ffffff",
 
   settings: {
     travelMode: google.maps.TravelMode.BICYCLING,
     unitSystem: google.maps.UnitSystem.METRIC,
     dataThreshold: 3000, // max number of elevation points to plot
+    showMileMarkers: true
   },
 
   map: null,
@@ -43,6 +46,7 @@ var ped = {
       function() { $(this).css("border", "solid 1px black") }
     );
 
+    $("#markers").click(ped.toggleMileMarkers);
     $("#undo").click(function() { ped.popPathElem(true); });
     $("#clear").click(ped.clear);
 
@@ -97,6 +101,7 @@ var ped = {
         pathElem.grade = pathElem.climb / pathElem.distance;
 
         ped.renderPathElemInfo(pathElem);
+        // If loading a path, only render the elevation on the last element
         if (ped.pathsToLoad.length > 0) {
           ped.loadNextPathElem();
         } else {
@@ -106,9 +111,14 @@ var ped = {
     });
   },
 
+  computePathMileMarkers: function(pathElem) {
+    //ped.renderNumberedMarker(ped.path.length, pathElem.node.getPosition(), ped.WHITE);
+    pathElem.mileMarkers.push(marker);
+    ped.computePathElevation(pathElem);
+  },
+
   // Asynchronously query the DirectionsRoute to the pathElem's node and draw them
   computePathEdge: function(pathElem) {
-    if (ped.path.length === 0) return;
     var prevElem = ped.path.slice(-1)[0];
 
     var request = {
@@ -121,7 +131,7 @@ var ped = {
     ped.directions.route(request, function(response, status) {
       if (status === google.maps.DirectionsStatus.OK) {
         pathElem.edge = response.routes[0];
-        pathElem.renderer.setDirections(response);
+        ped.renderDirections(pathElem, response);
 
         $.each(response.routes[0].legs, function(index, leg) {
           pathElem.distance += leg.distance.value;
@@ -129,30 +139,21 @@ var ped = {
         pathElem.totalDistance = prevElem.totalDistance + pathElem.distance;
         ped.renderDistance(pathElem.totalDistance);
 
-        ped.computePathElevation(pathElem);
+        ped.computePathMileMarkers(pathElem);
       };
     });
   },
 
   pushPathElem: function(event) {
     var pathElem = {
-      node: new google.maps.Marker({ 
-        position: event.latLng,
-        map: ped.map,
-      }),
+      node: ped.renderNumberedMarker(ped.path.length + 1, event.latLng, ped.RED),
       infoWindow: null,
 
       edge: null,
       elevations: [],
+      mileMarkers: [],
 
-      renderer: new google.maps.DirectionsRenderer({
-        suppressBicyclingLayer: true,
-        preserveViewport: true,
-        map: ped.map,
-        markerOptions: {
-          visible: false,
-        }
-      }),
+      renderer: null,
 
       distance: 0,
       totalDistance: 0,
@@ -160,7 +161,7 @@ var ped = {
       grade: 0
     }
 
-    ped.computePathEdge(pathElem);
+    if (ped.path.length > 0) ped.computePathEdge(pathElem);
     ped.path.push(pathElem);
 
     // When reloading a path, the first node won't trigger the asynchronous callback
@@ -173,7 +174,10 @@ var ped = {
     var pathElem = ped.path.pop();
 
     pathElem.node.setVisible(false);
-    pathElem.renderer.setMap(null);
+    $.each(pathElem.mileMarkers, function(index, marker) {
+      marker.setVisible(false);
+    });
+    if (pathElem.renderer) pathElem.renderer.setMap(null);
 
     if(rerender) {
       ped.renderDistance(pathElem.totalDistance - pathElem.distance);
@@ -190,8 +194,41 @@ var ped = {
     }
   },
 
+  toggleMileMarkers: function() {
+    ped.settings.showMileMarkers = !ped.settings.showMileMarkers;
+    $.each(ped.path, function(index, pathElem) {
+      $.each(pathElem.mileMarkers, function(index, marker) {
+        marker.setVisible(ped.settings.showMileMarkers);
+      });
+    });
+  },
+
 
   // Rendering
+
+  renderDirections: function(pathElem, response) {
+    if (pathElem.renderer === null) {
+      pathElem.renderer = new google.maps.DirectionsRenderer({
+        suppressBicyclingLayer: true,
+        preserveViewport: true,
+        map: ped.map,
+        markerOptions: {
+          visible: false,
+        }
+      });
+    };
+
+    pathElem.renderer.setDirections(response);
+  },
+
+  renderNumberedMarker: function(number, position, color) {
+    return new google.maps.Marker({
+      position: position,
+      map: ped.map,
+      icon: "http://chart.apis.google.com/chart?chst=d_map_pin_letter&chld=" +
+        Math.round(number) + "|" + color
+    });
+  },
 
   renderPathElemInfo: function(pathElem) {
     pathElem.infoWindow = new google.maps.InfoWindow({
@@ -222,7 +259,7 @@ var ped = {
     if (position === null) {
       ped.elevationTooltip.setVisible(false);
       return;
-    }
+    };
 
     ped.elevationTooltip.setVisible(true);
     ped.elevationTooltip.setPosition(position);
