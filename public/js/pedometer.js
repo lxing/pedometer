@@ -3,12 +3,14 @@ var ped = {
   settings: {
     travelMode: google.maps.TravelMode.BICYCLING,
     unitSystem: google.maps.UnitSystem.METRIC,
+    dataThreshold: 3000, // elevation points
   },
 
   map: null,
   directions: new google.maps.DirectionsService(),
   elevations: new google.maps.ElevationService(),
   elevationChart: null,
+  elevationTooltip: null,
   path: [],
   distance: 0,
 
@@ -20,8 +22,14 @@ var ped = {
       zoom: 13
     });
 
+    ped.elevationTooltip = new google.maps.Marker({
+      visible: false,
+      map: ped.map
+    }),
+
     google.maps.event.addListener(ped.map, "rightclick", function(event) { ped.pushPathNode(event); });
     $("#undo").click(function() { ped.popPathNode(true); });
+    $("#elevation").mouseout(function() { ped.renderElevationTooltip(null); });
   },
 
   // Asynchronously query the elevations along DirectionsRoute
@@ -59,6 +67,8 @@ var ped = {
           pathElem.distance += leg.distance.value;
         });
         pathElem.totalDistance = prevElem.totalDistance + pathElem.distance;
+        pathElem.node.setTitle(ped.mToKm(pathElem.distance) + "km | " +
+          ped.mToKm(pathElem.totalDistance) + "km total");
         ped.renderDistance(pathElem.totalDistance);
 
         ped.computePathElevation(pathElem);
@@ -71,7 +81,7 @@ var ped = {
       index: ped.path.length,
       node: new google.maps.Marker({ 
         position: event.latLng,
-        map: ped.map
+        map: ped.map,
       }),
       edge: null,
       elevations: [],
@@ -80,7 +90,7 @@ var ped = {
         preserveViewport: true,
         map: ped.map,
         markerOptions: {
-          visible: false
+          visible: false,
         }
       }),
       distance: 0,
@@ -104,28 +114,54 @@ var ped = {
     };
   },
 
+  clear: function() {
+    if (ped.elevationChart) ped.elevationChart.destroy();
+    ped.elevationChart = null;
+    while (ped.path.length > 0) {
+      ped.popPathNode(false);
+    }
+  },
+
 
 
   renderDistance: function(distance) {
-    $("#distance").html(Math.round(distance / 10) / 100 + " km");
+    $("#distance").html(ped.mToKm(distance) + " km");
+  },
+
+  renderElevationTooltip: function(position) {
+    if (position === null) {
+      ped.elevationTooltip.setVisible(false);
+      return;
+    }
+
+    ped.elevationTooltip.setVisible(true);
+    ped.elevationTooltip.setPosition(position);
   },
 
   renderElevation: function() {
-    var highChartsData = { x: [], y: [] };
-    $.each(ped.path, function(index, pathElem) {
+    var highChartsData = ped.path.reduce(function(highChartsData, pathElem) {
       startDistance = pathElem.totalDistance - pathElem.distance;
       step = pathElem.distance / pathElem.elevations.length;
 
-      $.each(pathElem.elevations, function(index, point) {
-        highChartsData.x.push(startDistance + step * index),
-        highChartsData.y.push(point.elevation)
-      });
-    });
+      return highChartsData.concat(pathElem.elevations.map(function(point, index) {
+        return {
+          x: startDistance + step * index,
+          y: point.elevation,
+          events: {
+            mouseOver: function() { ped.renderElevationTooltip(point.location); }
+          }
+        };
+      }));
 
-    console.log(highChartsData)
+    }, []);
 
     if (ped.elevationChart) ped.elevationChart.destroy();
-    chart = new Highcharts.Chart({
+    if (highChartsData.length > ped.settings.dataThreshold) {
+      $("#elevation").html("Path too long to graph");
+      return;
+    };
+
+    ped.elevationChart = new Highcharts.Chart({
       chart: {
         renderTo: "elevation",
         type: "area",
@@ -144,11 +180,10 @@ var ped = {
       xAxis: {
         tickInterval: 0,
         title: { text: "Distance" },
-        categories: highChartsData.x
       },
       tooltip: {
         formatter: function() {
-          return Math.round(this.x / 10) / 100 + "km | " + Math.round(this.y) + "m";
+          return ped.mToKm(this.x) + "km | " + Math.round(this.y) + "m";
         }
       },
       plotOptions: {
@@ -157,6 +192,9 @@ var ped = {
           marker: {
             enabled: false,
           },
+        },
+        series: {
+          turboThreshold: ped.settings.dataThreshold
         }
       },
       legend: {
@@ -164,10 +202,16 @@ var ped = {
       },
       series: [{
         name: "Elevation",
-        data: highChartsData.y
+        data: highChartsData
       }]
     });
   },
+
+
+
+  mToKm: function(m) {
+    return Math.round(m / 10) / 100;
+  }
 
 }
 

@@ -11,9 +11,11 @@ body {
 
 #distance {
   position: fixed; top: 10px; left: 47%;
+  width: 6%;
   border: solid 1px black;
   padding: 3px; margin: 10px;
   background: white;
+  text-align: center;
 }
 
 #elevation {
@@ -21,4 +23,5 @@ body {
   border: solid 1px black;
   padding: 3px; margin: 10px;
   background: white;
+  text-align: center;
 }
