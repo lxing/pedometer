@@ -38,11 +38,11 @@ body {
   left: 26%;
 }
 
-#undo {
+#save {
   left: 33%;
 }
 
-#clear {
+#load {
   left: 40%;
 }
 
@@ -51,11 +51,11 @@ body {
   background: white;
 }
 
-#save {
+#undo {
   left: 54%;
 }
 
-#load {
+#clear {
   left: 61%;
 }
 
@@ -69,7 +69,7 @@ body {
 }
 
 #persist {
-  top: 40px; left: 33%;
+  top: 40px; left: 12%;
   width: 34%;
   display: none;
 }
@@ -82,7 +82,7 @@ body {
 #sview, #help {
   top: 40px;
   padding-left: 12px; padding-top: 10px; padding-right: 12px; padding-bottom: 10px;
-  text-align: justify; font-size: 12;
+  text-align: left; font-size: 12;
   display: none;
 }
 
