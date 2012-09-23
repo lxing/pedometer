@@ -3,6 +3,8 @@ var ped = {
   DEFAULT_CENTER: new google.maps.LatLng(37.4419, -122.1419), // Palo Alto :3
   RED: "ff776b",
   WHITE: "ffffff",
+  GREEN: "00933b",
+  BLUE: "0266c8",
   R: 6371 * 1000, // Earth radius in m
 
   IMPERIAL: {
@@ -33,9 +35,15 @@ var ped = {
   map: null,
   directions: new google.maps.DirectionsService(),
   elevations: new google.maps.ElevationService(),
+
   elevationChart: null,
   elevationTooltip: null,
+
+  sviewElemIndex: 0, // Which pathElem the street view is focused on
+  sviewLegIndex: 0, // Which leg of the path the street view is focused on
+  sviewDirection: 1, // -1 for reverse
   sviewTooltip: null,
+
   path: [],
   pathsToLoad: [],
 
@@ -51,15 +59,8 @@ var ped = {
       zoom: 13
     });
 
-    ped.elevationTooltip = new google.maps.Marker({
-      visible: false,
-      map: ped.map
-    });
-
-    ped.sview = new google.maps.Marker({
-      visible: false,
-      map: ped.map
-    });
+    ped.elevationTooltip = ped.renderLabeledMarker("", null, ped.BLUE, false, 2);
+    ped.sviewTooltip = ped.renderLabeledMarker("", null, ped.GREEN, false, 1);
 
     google.maps.event.addListener(ped.map, "rightclick", function(event) {
       ped.pushPathElem(event, true);
@@ -106,6 +107,8 @@ var ped = {
     $("#help_button").click(function() {
       $("#help").toggle("fast");
     });
+
+    $("#sview_f").click(function() { ped.moveSview(1, false) });
 
     $("#elevation").mouseout(function() { ped.renderElevationTooltip(null); });
   },
@@ -154,7 +157,7 @@ var ped = {
     $.each(pathElem.edge.overview_path.slice(1), function(index, position) {
       var estimate = ped.haversineDistAndBearing(position, pathElem.edge.overview_path[index]);
       pathElem.haversineDistances.push(estimate.distance);
-      pathElem.bearings.push(estimate.bearing);
+      pathElem.bearings.push((estimate.bearing + 180) % 360); // Flip the bearing
     });
 
     var haversineSum = pathElem.haversineDistances.reduce(function(sum, distance) {
@@ -164,7 +167,7 @@ var ped = {
     $.each(pathElem.edge.overview_path.slice(1), function(index, position) {
       distance += pathElem.haversineDistances[index] / haversineSum  * pathElem.distance;
       if (distance > nextMileToRender * ped.settings.mPerBigUnit) {
-        var marker = ped.renderNumberedMarker(
+        var marker = ped.renderLabeledMarker(
           nextMileToRender, position, ped.WHITE, ped.settings.showMileMarkers, -1);
         pathElem.mileMarkers.push(marker);
         nextMileToRender += 1;
@@ -203,11 +206,11 @@ var ped = {
 
   pushPathElem: function(event) {
     var pathElem = {
-      node: ped.renderNumberedMarker(
+      node: ped.renderLabeledMarker(
         ped.path.length + 1, event.latLng, ped.RED, true, 0),
       infoWindow: null,
 
-      edge: null,
+      edge: { overview_path : [] },
       haversineDistances: [],
       bearings: [],
       elevations: [],
@@ -254,6 +257,19 @@ var ped = {
     }
   },
 
+  moveSview: function(direction, skip) {
+    ped.sviewElemIndex = 1;
+    ped.sviewLegIndex += 1;
+
+    var pathElem = ped.path[ped.sviewElemIndex];
+    var position = pathElem.edge.overview_path[ped.sviewLegIndex];
+    var bearing = pathElem.bearings[ped.sviewLegIndex - 1];
+    if (direction < 0) bearing *= -1;
+
+    ped.renderSviewInfo();
+    ped.renderSviewImage(position, bearing);
+  },
+
   toggleMileMarkers: function(showing) {
     ped.settings.showMileMarkers = !showing;
     $.each(ped.path, function(index, pathElem) {
@@ -289,6 +305,30 @@ var ped = {
 
   // Rendering
 
+  renderSviewInfo: function() {
+    $("#sview_elem").html(ped.sviewElemIndex);
+    $("#sview_leg").html(ped.sviewLegIndex);
+    $("#sview_leg_total").html(ped.path[ped.sviewElemIndex].bearings.length);
+  },
+
+  renderSviewImage: function(position, bearing) {
+    if (position === null) {
+      ped.sviewTooltip.setVisible(false);
+      return;
+    };
+
+    ped.sviewTooltip.setVisible(true);
+    ped.sviewTooltip.setPosition(position);
+
+    $("#sview").show();
+
+    $("#sview_image").attr("src", "http://maps.googleapis.com/maps/api/streetview?" +
+      "size=300x300" +
+      "&location=" + position.lat() + "," + position.lng() +
+      "&heading=" + bearing +
+      "&fov=90&sensor=false");
+  },
+
   renderDirections: function(pathElem, response) {
     if (pathElem.renderer === null) {
       pathElem.renderer = new google.maps.DirectionsRenderer({
@@ -304,14 +344,14 @@ var ped = {
     pathElem.renderer.setDirections(response);
   },
 
-  renderNumberedMarker: function(number, position, color, show, zIndex) {
+  renderLabeledMarker: function(number, position, color, visible, zIndex) {
     return new google.maps.Marker({
-      visible: show,
+      visible: visible,
       position: position,
       map: ped.map,
       zIndex: zIndex,
       icon: "http://chart.apis.google.com/chart?chst=d_map_pin_letter&chld=" +
-        Math.round(number) + "|" + color
+        number + "|" + color
     });
   },
 
@@ -433,7 +473,7 @@ var ped = {
 
   encodePath: function() {
     var path = ped.path.map(function(pathElem, index) {
-      var latLng = pathElem.node.getPosition();
+      var latLng = pathElem.node.position;
       return [latLng.Xa, latLng.Ya];
     });
     return lzwEncode(Base64.encode(JSON.stringify(path)));

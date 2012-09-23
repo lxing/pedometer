@@ -22,6 +22,10 @@ body {
   width: 6%;
 }
 
+.clickable {
+  cursor: pointer;
+}
+
 #travel_mode {
   left: 12%;
 }
@@ -76,20 +80,35 @@ body {
 }
 
 #sview, #help {
-  top: 40px; left: 68%;
-  width: 19%;
-  padding-left: 15px;
+  top: 40px;
+  padding-left: 12px; padding-top: 10px; padding-right: 12px; padding-bottom: 10px;
   text-align: justify; font-size: 12;
   display: none;
 }
 
-#sview_controls {
-  text-align: center;
+#sview {
+  left: 61%;
+  width: 26%;
 }
 
 .sview-control {
-  padding-left: 5%; padding-right: 5%;
+  padding-left: 3%; padding-right: 3%;
   border: solid 1px black;
+}
+
+#sview_image_container {
+  height: 50%;
+  margin-top: 8px;
+  border: solid 1px black;
+}
+
+#sview_image {
+  width:100%; height:100%;
+}
+
+#help {
+  left: 68%;
+  width: 19%;
 }
 
 #elevation {
